@@ -10,3 +10,5 @@ cd tracy
 make
 ./tracy
 ```
+
+Requires [rust](https://www.rustup.rs), [SFML 2.5](http://www.sfml-dev.org/download.php), and [CSFML 2.5](http://www.sfml-dev.org/download/csfml/) to run.
