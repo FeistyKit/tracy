@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{io::Write, ops};
 
 use sfml::{graphics, system};
 
@@ -80,6 +80,17 @@ impl Point {
     }
 }
 
+impl ops::Add for Point {
+    type Output = Point;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Point {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y
+        }
+    }
+}
+
 impl From<(f32, f32)> for Point {
     fn from((x, y): (f32, f32)) -> Self {
         assert!(!x.is_nan());
@@ -103,10 +114,6 @@ impl Line {
     pub fn cast_in_scene(&self, scene: &Scene) -> Line {
         let mut line = self.clone();
         for wall in &scene.walls {
-            println!("--------------------");
-            dbg!(&line);
-            dbg!(wall);
-            std::io::stderr().flush().unwrap();
             line = line.cast_to_line(wall);
         }
         line
@@ -157,7 +164,17 @@ impl Line {
     }
 
     pub fn offset(&mut self, x: f32, y: f32) {
-        self.y_intercept += y - self.slope * x;
+        let offset = (x, y).into();
+        let lhs = self.left_point() + offset;
+        let rhs = self.right_point() + offset;
+
+        if self.left_to_right {
+            *self = Line::from_points(lhs, rhs);
+        } else {
+            *self = Line::from_points(rhs, lhs);
+        }
+
+        // self.y_intercept += y - self.slope * x;
     }
 
     pub fn cast_to_line(&self, other: &Line) -> Line {

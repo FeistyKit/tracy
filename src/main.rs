@@ -1,11 +1,13 @@
+mod math;
 #[cfg(test)]
 mod tests;
-mod math;
 
-use math::{Scene, Point, Line};
+use std::f32::consts::PI;
+
+use math::{Line, Point, Scene};
 use sfml::{
-    graphics::{RenderWindow, self, RenderTarget},
-    window::{Style, self, mouse},
+    graphics::{self, RenderTarget, RenderWindow},
+    window::{self, mouse, Style},
 };
 
 const WINDOW_WIDTH: u32 = 1200;
@@ -15,89 +17,98 @@ fn main() {
     let mut window = RenderWindow::new(
         (WINDOW_HEIGHT, WINDOW_WIDTH),
         "Tracy!",
-        Style::CLOSE,
+        Style::RESIZE,
         &Default::default(),
     );
 
-    let mut vertexarr = graphics::VertexArray::new(graphics::PrimitiveType::LINES, 2);
+    let mut scene_vertices = graphics::VertexArray::new(graphics::PrimitiveType::LINES, 2);
 
     let mut scene = Scene::new();
-    // TODO: Support vertical lines
-    scene.add_line(((WINDOW_WIDTH / 2) as f32, 0.0).into(), ((WINDOW_WIDTH / 2) as f32 + 0.1, (WINDOW_HEIGHT / 2) as f32).into(), &mut vertexarr);
 
-    let mut from_bottom_left = true;
+    // TODO: Support vertical lines
+    scene.add_line(
+        ((WINDOW_WIDTH / 2) as f32, 0.0).into(),
+        ((WINDOW_WIDTH / 2) as f32 + 0.1, (WINDOW_HEIGHT / 2) as f32).into(),
+        &mut scene_vertices,
+    );
+
+    const LINE_LENGTH: f32 = 1000.0;
+
+    let mut rays = (0..(360 * 4))
+        .into_iter()
+        .filter(|x| (x / 4) % 180 != 90)
+        .map(|x| (x / 4) as f32 * PI / 180.0)
+        .map(|x| Line::new(0.0, 0.0, x.cos() * LINE_LENGTH, x.sin() * LINE_LENGTH))
+        .collect::<Vec<_>>();
+
+    let mut prev_x = 0;
+    let mut prev_y = 0;
+
+    let mut moving = true;
 
     while window.is_open() {
         while let Some(event) = window.poll_event() {
             match event {
                 window::Event::Closed => window.close(),
                 window::Event::KeyPressed {
-                    code: window::Key::ESCAPE,
+                    code: c,
                     alt: _,
                     ctrl: _,
                     shift: _,
                     system: _,
-                } => window.close(),
-                window::Event::KeyPressed {
-                    code: window::Key::C,
-                    alt: _,
-                    ctrl: _,
-                    shift: _,
-                    system: _,
-                } => {
-                    vertexarr.clear();
-                    scene = Scene::new();
-                    scene.add_line(((WINDOW_WIDTH / 2) as f32, 0.0).into(), ((WINDOW_WIDTH / 2) as f32 + 0.1, (WINDOW_HEIGHT / 2) as f32).into(), &mut vertexarr);
+                } => match c {
+                    window::Key::C => {
+                        scene_vertices.clear();
+                        scene = Scene::new();
+                        scene.add_line(
+                            ((WINDOW_WIDTH / 2) as f32, 0.0).into(),
+                            ((WINDOW_WIDTH / 2) as f32 + 0.1, (WINDOW_HEIGHT / 2) as f32).into(),
+                            &mut scene_vertices,
+                        );
+                    }
+                    window::Key::ESCAPE => window.close(),
+                    window::Key::S => {
+                        moving = !moving;
+                    }
+                    _ => {}
                 },
-                window::Event::KeyPressed {
-                    code: window::Key::S,
-                    alt: _,
-                    ctrl: _,
-                    shift: _,
-                    system: _,
-                } => {
-                    scene.re_init_graphics(&mut vertexarr);
-
-                    from_bottom_left = !from_bottom_left;
-                },
-                window::Event::MouseButtonPressed {
-                    button: b,
-                    x,
-                    y
-                } => {
+                window::Event::MouseButtonPressed { button: _, x, y } => {
                     let x = x as f32;
                     let y = y as f32;
                     let click_point: Point = (x, y).into();
 
-                    match b {
-                        mouse::Button::LEFT => {
-                            let start_point: Point = if from_bottom_left {
-                                (0.0, WINDOW_HEIGHT as f32).into()
-                            } else {
-                                (WINDOW_WIDTH as f32, 0.0).into()
-                            };
-
-                            let full_line = Line::from_points(start_point, click_point);
-
-                            let line_to_render = full_line.cast_in_scene(&scene);
-
-                            let (start_vertex, end_vertex) = line_to_render.renderable(graphics::Color::RED);
-
-                            vertexarr.append(&start_vertex);
-                            vertexarr.append(&end_vertex);
-                        },
-                        mouse::Button::RIGHT => scene.add_line_continuous(click_point, &mut vertexarr),
-                        _ => {}
-                    }
-
+                    scene.add_line_continuous(click_point, &mut scene_vertices);
                 }
+                window::Event::MouseMoved { x, y } => {
+                    if moving {
+                        let dx = x - prev_x;
+                        let dy = y - prev_y;
+
+                        for ray in &mut rays {
+                            ray.offset(dx as f32, dy as f32);
+                        }
+                        prev_x = x;
+                        prev_y = y;
+                    }
+                }
+
                 _ => {}
             }
         }
         window.set_active(true);
         window.clear(graphics::Color::BLACK);
 
-        window.draw(&vertexarr);
+        let mut rays_arr = graphics::VertexArray::new(graphics::PrimitiveType::LINES, 0);
+        for ray in rays.iter() {
+            let collided_ray = ray.cast_in_scene(&scene);
+
+            let (start_v, end_v) = collided_ray.renderable(graphics::Color::WHITE);
+            rays_arr.append(&start_v);
+            rays_arr.append(&end_v);
+        }
+
+        window.draw(&rays_arr);
+        window.draw(&scene_vertices);
         window.display();
     }
 }
