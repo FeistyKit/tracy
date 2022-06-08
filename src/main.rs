@@ -7,11 +7,13 @@ use std::f32::consts::PI;
 use math::{Line, Point, Scene};
 use sfml::{
     graphics::{self, RenderTarget, RenderWindow},
-    window::{self, mouse, Style},
+    window::{self, mouse, Style}, system,
 };
 
 const WINDOW_WIDTH: u32 = 1200;
 const WINDOW_HEIGHT: u32 = 1200;
+
+const FRAG_SHADER: &'static str = include_str!("./main.frag");
 
 fn main() {
     let mut window = RenderWindow::new(
@@ -32,7 +34,7 @@ fn main() {
         &mut scene_vertices,
     );
 
-    const LINE_LENGTH: f32 = 1000.0;
+    const LINE_LENGTH: f32 = 500.0;
 
     let mut rays = (0..(360 * 4))
         .into_iter()
@@ -98,7 +100,7 @@ fn main() {
         window.set_active(true);
         window.clear(graphics::Color::BLACK);
 
-        let mut rays_arr = graphics::VertexArray::new(graphics::PrimitiveType::LINES, 0);
+        let mut rays_arr = graphics::VertexArray::new(graphics::PrimitiveType::TRIANGLE_STRIP, 0);
         for ray in rays.iter() {
             let collided_ray = ray.cast_in_scene(&scene);
 
@@ -107,8 +109,22 @@ fn main() {
             rays_arr.append(&end_v);
         }
 
-        window.draw(&rays_arr);
         window.draw(&scene_vertices);
+
+        if let Some(mut shader) = graphics::Shader::from_memory(None, None, Some(FRAG_SHADER)) {
+            shader.set_uniform_vec2("Centre", (prev_x as f32, prev_y as f32).into());
+            shader.set_uniform_vec3("Colour", (255.0, 255.0, 255.0).into());
+            shader.set_uniform_float("Radius", LINE_LENGTH);
+
+            let mut states = graphics::RenderStates::default();
+            states.set_shader(Some(&shader));
+
+            window.draw_with_renderstates(&rays_arr, &states)
+
+        } else {
+            panic!("Could not use shader!");
+        }
+
         window.display();
     }
 }
