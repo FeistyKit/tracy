@@ -13,7 +13,7 @@ use sfml::{
 const WINDOW_WIDTH: u32 = 1200;
 const WINDOW_HEIGHT: u32 = 1200;
 
-const FRAG_SHADER: &'static str = include_str!("./main.frag");
+const FRAG_SHADER: &str = include_str!("./frag.frag");
 
 fn main() {
     let mut window = RenderWindow::new(
@@ -38,7 +38,6 @@ fn main() {
 
     let mut rays = (0..(360 * 4))
         .into_iter()
-        .filter(|x| (x / 4) % 180 != 90)
         .map(|x| (x / 4) as f32 * PI / 180.0)
         .map(|x| Line::new(0.0, 0.0, x.cos() * LINE_LENGTH, x.sin() * LINE_LENGTH))
         .collect::<Vec<_>>();
