@@ -238,7 +238,14 @@ impl LineInner {
         }
     }
 
-    line_impl!(mut offset(x: f32, y: f32));
+    pub fn offset(&mut self, x: f32, y: f32) {
+        let t = match self {
+            LineInner::Normal(v) => v.offset(x, y),
+            LineInner::Vertical(v) => v.offset(x, y),
+        };
+
+        *self = t;
+    }
 
     line_impl!(nonmut renderable(col: graphics::Color) -> (graphics::Vertex, graphics::Vertex));
 
@@ -284,10 +291,16 @@ impl VerticalLine {
             down_to_up,
         }
     }
-    fn offset(&mut self, x: f32, y: f32) {
-        self.x += x;
-        self.max_y += y;
-        self.min_y += y;
+    fn offset(&self, x: f32, y: f32) -> LineInner {
+
+        let new_vert = VerticalLine {
+            x: self.x + x,
+            max_y: self.max_y + y,
+            min_y: self.min_y + y,
+            down_to_up: self.down_to_up
+        };
+
+        LineInner::Vertical(new_vert)
     }
 
     fn renderable(&self, col: graphics::Color) -> (graphics::Vertex, graphics::Vertex) {
@@ -400,16 +413,32 @@ impl NormalLine {
         self.point_at(self.max_x).unwrap()
     }
 
-    fn offset(&mut self, x: f32, y: f32) {
+    fn offset(&self, x: f32, y: f32) -> LineInner {
         let offset = (x, y).into();
-        assert_ne!(self.min_x, self.max_x);
         let lhs = self.left_point() + offset;
         let rhs = self.right_point() + offset;
 
-        if self.left_to_right {
-            *self = NormalLine::from_points(lhs, rhs);
+        // TODO: Normal lines becoming vertical in NormalLine::offset
+        // If the minimum and maximum x values are close enough, nor-
+        // mal lines can become Vertical lines after an offset as the
+        // floats round to the same number. Currently we are support-
+        // ing this behaviour but it should not happen, and could
+        // start affecting more lines as the offsets get bigger.
+        if lhs.x == rhs.x {
+            let vert_line = if self.left_to_right {
+                VerticalLine::from_points(lhs, rhs)
+            } else {
+                VerticalLine::from_points(rhs, lhs)
+            };
+            LineInner::Vertical(vert_line)
         } else {
-            *self = NormalLine::from_points(rhs, lhs);
+            let normal_line = if self.left_to_right {
+                NormalLine::from_points(lhs, rhs)
+            } else {
+                NormalLine::from_points(rhs, lhs)
+            };
+
+            LineInner::Normal(normal_line)
         }
     }
 
