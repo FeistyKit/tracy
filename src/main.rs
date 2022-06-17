@@ -119,7 +119,6 @@ fn main() {
             states.set_shader(Some(&shader));
 
             window.draw_with_renderstates(&rays_arr, &states)
-
         } else {
             panic!("Could not use shader!");
         }
