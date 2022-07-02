@@ -1,4 +1,4 @@
-#version 300 es
+#version 330
 
 precision mediump float;
 layout(origin_upper_left) in vec4 gl_FragCoord;
